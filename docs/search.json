@@ -1,0 +1,23 @@
+[
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "Home",
+    "section": "",
+    "text": "Welcome! My name is Liana Hill. I am a first year PhD student in the Department of Biostatistics. I am from southern Maryland, specifically Prince George’s County. In my free time, I love to go to the beach or spend time with my cats.\n\n\n\nMy Favorite Beach\n\n\nReminder to render the webpage: hit three dots in top right corner, select preview."
+  },
+  {
+    "objectID": "about.html",
+    "href": "about.html",
+    "title": "About Me",
+    "section": "",
+    "text": "Hello! I am a first year PhD student in the Department of Biostatistics. Before coming to Johns Hopkins, I graduated from the University of Maryland, Baltimore County (UMBC) with a bachelor’s degree in statistics.\nMy research interests include …"
+  },
+  {
+    "objectID": "data_analysis.html",
+    "href": "data_analysis.html",
+    "title": "Data Analysis",
+    "section": "",
+    "text": "# insert data analysis here"
+  }
+]

@@ -1,0 +1,10 @@
+---
+title: "About Me"
+---
+
+Hello! I am a first year PhD student in the Department of Biostatistics. Before coming to Johns Hopkins, I graduated from the University of Maryland, Baltimore County (UMBC) with a bachelor's degree in statistics. 
+
+My research interests include ...
+
+
+
