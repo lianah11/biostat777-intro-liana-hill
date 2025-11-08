@@ -1,11 +1,264 @@
 ---
-title: "Data Analysis"
+title: "Example Analysis"
 format: "html"
 ---
 
+# STUFF I NEED TO DO
+- find image and imbed it in file
+- call out functions
+
+
+
+Meta-analysis 
+
+plant functional types are sets of species with similar responses to the environment and with similar effects on ecosystem functioning ==> need reference here
+
+The dataset consists of 102 studies with 20 variables. Eleven are numeric variables and nine are character variables. These studies compared above and below-ground biomass (measured in grams) of plants exposed to ambient CO2 levels (control group) versus elevated CO2 levels (treatment group).
+
+# Research question: 
+Research question: Determine if there is an overall difference between in above and below-ground biomass of plants exposed to C02 levels (control group) versus elevated C02 levels (treatment group). 
+
+# Intended Audience: 
+Audience: 
+- example for conducting meta-analysis 
 
 ```{r}
-# insert data analysis here
+#| message: false
+#| echo: false
 
+options(repos = c(CRAN = "https://cran.rstudio.com/"))
+
+install.packages("dplyr")
+install.packages("ggplot2")
+install.packages("metadat")
+install.packages("meta")
+install.packages("metafor") # calculate effect sizes and conduct meta-regression
+install.packages("knitr")
+install.packages("gt") # helps make tables
+
+library(dplyr)
+library(ggplot2)
+library(metadat) 
+library(meta)
+library(metafor)
+library(glue)
+library(gt)
 
 ```
+
+# Data Source and Dictionary
+This dataset comes from the metadat package, and the original study was conducted by Curtis, et. al. The article, Studies on the Effects of Elevated CO2 Levels on Woody Plant Mass, can be found here: https://go.gale.com/ps/i.do?id=GALE%7CA54994046&sid=googleScholar&v=2.1&it=r&linkaccess=fulltext&issn=00129658&p=AONE&sw=w&userGroupName=sailor_main&aty=ip#:~:text=The%20increasingly%20large%20body%20of%20studies%20in,been%20introduced%20to%20ecology%20(Gurevitch%20et%20al. 
+
+## Data Dictionary
+| Variable Name | Variable Definition |
+|---------|:-----|
+| id | observation number |
+| paper | paper number |
+| genus | name of species |
+| species | name of species |
+| fungrp | plant functional group |
+| co2.ambi | ambient CO2 level control group|
+| co2.elev | elevated CO2 level for treatmet group |
+| units | units for C02 exposure levels |
+| time | maximum length of time days of C02 exposure |
+| pot | growing methods |
+| method | CO2 exposure facility |
+| stock | planting stock code |
+| xtrt | interacting treatment code |
+| level | interaction treatment level |
+| m1i | mean plant mass under elevated CO2 level for treatment group |
+| sd1i | standard deviation of plant mass under elevated CO2 level for treatment group |
+| n1i | number of observations under elevated CO2 level for  treatment group |
+| m2i | mean plant mass under ambient CO2 level for control group |
+| sd2i | standard deviation of plant mass under ambient CO2 level for control group |
+| n2i | number of observations under ambient CO2 level for control group |
+:Data dictionary comes from : 
+
+## Snapshot into Top and Bottom of Data
+```{r}
+# loading in data
+metadata <- metadat::dat.curtis1998
+
+# check for missing values
+sum(is.na((metadata)))
+
+head(metadata)
+tail(metadata)
+
+```
+
+
+```{r}
+# subsetting based on variables of dat_interest
+dat_interest <- metadata %>%
+  select(n1i, m1i, sd1i, n2i, m2i, sd2i, fungrp, time, method, stock, genus)
+
+```
+
+
+# Analysis - FIX
+
+## Effect Size Calculation
+```{r}
+effect_size_dat <- metafor::escalc(
+  measure = "SMD",
+  n1i = n1i, n2i = n2i,
+  m1i = m1i, m2i = m2i,
+  sd1i = sd1i, sd2i = sd2i,
+  data = dat_interest, append = TRUE
+) %>%
+  # 3) mutate: clean/categorize moderators
+  mutate(
+    time_bin = case_when(
+      time <= 4 ~ "Early (≤4)",
+      time <= 10 ~ "Mid (5–10)",
+      TRUE ~ "Late (>10)"
+    ) #, method = fct_infreq(as.factor(method)), fungrp = fct_infreq(as.factor(fungrp))
+  ) %>%
+  # 4) tidyr::replace_na: ensure no NA text labels for plotting
+  tidyr::replace_na(list(genus = "Unknown", stock = "Unknown")) %>%
+  # 5) arrange: stable ordering
+  arrange(fungrp, method, time) 
+
+
+# 6) group_by + summarise: roll-up summaries for a table
+mod_summ <- effect_size_dat %>%
+  group_by(fungrp, method) %>%
+  summarise(
+    k = n(),
+    mean_yi = mean(yi, na.rm = TRUE),
+    mean_vi = mean(vi, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(k))
+
+# 7) pivot_longer: reshape for a tidy summary table
+#mod_summ_long <- mod_summ %>%
+#  pivot_longer(cols = c(mean_yi, mean_vi), names_to = "metric", values_to = "value")
+
+```
+
+
+```{r}
+
+# yi = effect size of each study?
+# vi = variance of each study?
+mod_summ %>%
+  gt() %>%
+  tab_header(title = "Moderator Summary by Functional Group and Method") %>%
+  fmt_number(columns = c(mean_yi, mean_vi), decimals = 3)
+
+```
+
+
+```{r}
+# Mean Difference
+# ===== calculates MD for each study
+MD_results <- metacont(n1i, m1i, sd1i, n2i, m2i, sd2i, sm = "MD", data = metadata)
+summary(MD_results)
+
+# Standardized Mean Difference
+# ====== calculates SMD for each study
+SMD_results <- metacont(n1i, m1i, sd1i, n2i, m2i, sd2i, sm = "SMD", data = metadata)
+summary(SMD_results)
+```
+
+
+# Regression Models
+
+## Single Moderators/Covariates
+```{r}
+# Regression Models
+metareg_fg <- rma(yi, vi, mods= ~fungrp, data = effect_size_dat)
+metareg_time <- rma(yi, vi, mods= ~time, data = effect_size_dat)
+metareg_method <- rma(yi, vi, mods= ~method, data = effect_size_dat)
+metareg_stock <- rma(yi, vi, mods= ~stock, data = effect_size_dat)
+
+metareg_fg
+metareg_time
+metareg_method
+metareg_stock
+```
+
+## Multiple Moderators/Covariates
+```{r}
+metareg_fg_time_method <- rma(yi, vi, mods= ~fungrp + time + method, data = effect_size_dat)
+metareg_fg_method <- rma(yi, vi, mods= ~fungrp + method, data = effect_size_dat)
+metareg_time_method <- rma(yi, vi, mods= ~time + method, data = effect_size_dat)
+metareg_fg_time <- rma(yi, vi, mods= ~fungrp + time, data = effect_size_dat)
+
+metareg_fg_time_method
+metareg_fg_method
+metareg_time_method
+metareg_fg_time
+
+```
+
+
+
+# Plots
+## Distribution of Study Means
+```{r}
+ggplot(effect_size_dat, aes(x = yi)) +
+  geom_histogram() +
+  labs(
+    title = "Distribution of Standardized Mean Differences (yi)",
+    subtitle = "Computed via metafor::escalc with measure='SMD'",
+    x = "Standardized Mean Difference (yi)",
+    y = "Count",
+    caption = "Source: metadat::dat.curtis1998; Methods: metafor, dplyr, ggplot2"
+  )
+
+```
+
+
+## Effect Size (Mean) Compared to Time Across Funtional Groups
+```{r}
+ggplot(effect_size_dat, aes(x = time, y = yi)) +
+  geom_point(alpha = 0.7) +
+  # scales = free_y means only x's are fixed
+  facet_wrap(~ fungrp, scales = "free_y") +
+  labs(
+    title = "Effect Size vs. Time",
+    subtitle = "Comparing Relations Across Functional Groups",
+    x = "Time",
+    y = "Standardized Mean Difference (yi)",
+    caption = "SMD = Standardized Mean Difference"
+  )
+```
+
+
+## Confidence Intervals of Each Study
+```{r}
+
+# making data frame of confidence intervals
+ci_dat <- effect_size_dat %>%
+  mutate(
+    se = sqrt(vi),
+    ci_lo = yi - 1.96 * se,
+    ci_hi = yi + 1.96 * se,
+    study_id = row_number()
+  )
+
+ggplot(ci_dat, aes(x = study_id, y = yi, ymin = ci_lo, ymax = ci_hi)) +
+  geom_pointrange() +
+  labs(
+    title = "Effect Sizes of Each Study with 95% CIs",
+    subtitle = "True Effect Size is SMD = 0",
+    x = "Study index",
+    y = "Standardized Mean Difference (yi)",
+    caption = "CIs computed as yi ± 1.96*SE where yi = SMD of study"
+  )
+
+```
+
+
+# Conclusion/Summary:
+
+The biomass of woody plants is higher for elevated CO2 levels compared to the biomass of woody plants for ambient CO2 levels.
+
+
+# Functions used in data analysis:
+1. From dyplr: 
+2. From ggplot: geom_histogram, geom_pointrange, geom_point
+
