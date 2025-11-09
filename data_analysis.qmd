@@ -3,51 +3,56 @@ title: "Example Analysis"
 format: "html"
 ---
 
-# STUFF I NEED TO DO
-- find image and imbed it in file
-- call out functions
+Statistical meta-analysis is a method used across studies to systematically combine and analyze data from multiple studies on a particular topic. Oftentimes, researchers encounter conflicting results across studies, i.e. a finding that appears statistically significant in one study but lacks significance in another. This variance could stem from differences in study designs, sample characteristics, or many other factors. Through meta-analysis, we can navigate through conflicting results, derive more reliable conclusions about the relationships between variables, and systematic approach to interpret this variability in findings across studies.
 
+::: {.column-margin}
+![Hierarchy of Scientific Evidence](.\images\meta_analysis_pyramid.jpg)
+:::
 
+In this report, we will practice meta-analysis using a dataset from the **metadat** package in R. This dataset contains 102 studies that examined the effects of elevated CO2 levels in woody plant mass by comparing above and below-ground biomass (measured in grams) of plants exposed to ambient CO2 levels (control group) versus elevated CO2 levels (treatment group). 
 
-Meta-analysis 
-
-plant functional types are sets of species with similar responses to the environment and with similar effects on ecosystem functioning ==> need reference here
-
-The dataset consists of 102 studies with 20 variables. Eleven are numeric variables and nine are character variables. These studies compared above and below-ground biomass (measured in grams) of plants exposed to ambient CO2 levels (control group) versus elevated CO2 levels (treatment group).
+::: {.callout-note}
+# Want to know more?
+If you want to read more about meta-analysis, [here](https://onlinelibrary.wiley.com/doi/book/10.1002/9780470743386) is a link to a book to learn more.
+:::
 
 # Research question: 
-Research question: Determine if there is an overall difference between in above and below-ground biomass of plants exposed to C02 levels (control group) versus elevated C02 levels (treatment group). 
+We are interested in determining if there is an overall difference between in above and below-ground biomass of plants exposed to C02 levels (control group) versus elevated C02 levels (treatment group). 
 
 # Intended Audience: 
-Audience: 
-- example for conducting meta-analysis 
+The intended audience for this report is students in statistics hoping to get quick overview about meta-analysis and see an example for conducting meta-analysis. 
 
+
+# Analysis
+
+We can begin by loading the data and the necessary packages to condudct meta-analysis.
 ```{r}
 #| message: false
-#| echo: false
+#| warning: false
+#| results: 'hide'
 
 options(repos = c(CRAN = "https://cran.rstudio.com/"))
 
 install.packages("dplyr")
+install.packages("knitr")
 install.packages("ggplot2")
-install.packages("metadat")
+install.packages("metadat") 
 install.packages("meta")
 install.packages("metafor") # calculate effect sizes and conduct meta-regression
-install.packages("knitr")
-install.packages("gt") # helps make tables
 
 library(dplyr)
+library(knitr)
 library(ggplot2)
 library(metadat) 
 library(meta)
 library(metafor)
-library(glue)
-library(gt)
-
 ```
 
 # Data Source and Dictionary
-This dataset comes from the metadat package, and the original study was conducted by Curtis, et. al. The article, Studies on the Effects of Elevated CO2 Levels on Woody Plant Mass, can be found here: https://go.gale.com/ps/i.do?id=GALE%7CA54994046&sid=googleScholar&v=2.1&it=r&linkaccess=fulltext&issn=00129658&p=AONE&sw=w&userGroupName=sailor_main&aty=ip#:~:text=The%20increasingly%20large%20body%20of%20studies%20in,been%20introduced%20to%20ecology%20(Gurevitch%20et%20al. 
+The dataset consists of 102 studies with 20 variables. Eleven are numeric variables and nine are character variables. These studies compared above and below-ground biomass (measured in grams) of plants exposed to ambient CO2 levels (control group) versus elevated CO2 levels (treatment group).
+
+This dataset comes from the **metadat** package, and the original study was conducted by Peter S. Curtis and Xianzhong Wang. The article can be found [here](https://link.springer.com/article/10.1007/s004420050381)).
+ 
 
 ## Data Dictionary
 | Variable Name | Variable Definition |
@@ -72,23 +77,26 @@ This dataset comes from the metadat package, and the original study was conducte
 | m2i | mean plant mass under ambient CO2 level for control group |
 | sd2i | standard deviation of plant mass under ambient CO2 level for control group |
 | n2i | number of observations under ambient CO2 level for control group |
-:Data dictionary comes from : 
+:Data dictionary comes from https://cloud.r-project.org/web/packages/metadat/metadat.pdf: 
 
+
+# Exploratory Analysis
 ## Snapshot into Top and Bottom of Data
+
+First, we want to explore the data by examining the first and last few rows of the data, and subsetting the data based on specific variables of interest as they relate to our research question. These variables include the name of the plant species (species), functional group of the plants (fungrp), how long the plants were exposed to C02 (time), the CO2 exposure facility (method), the planting stock (stock), and the name of the species (genus).
+
+In order to conduct our statistical analysis, we also need to obtain the mean plant mass for each study under the control group and treatment group (m1i and m2i), the standard deviations of each study (sd1i and sd2i), and the number of plants under the different treatments (n1i and n2i). 
+
 ```{r}
 # loading in data
 metadata <- metadat::dat.curtis1998
 
 # check for missing values
-sum(is.na((metadata)))
+# sum(is.na((metadata))) # no missing data found
 
 head(metadata)
 tail(metadata)
 
-```
-
-
-```{r}
 # subsetting based on variables of dat_interest
 dat_interest <- metadata %>%
   select(n1i, m1i, sd1i, n2i, m2i, sd2i, fungrp, time, method, stock, genus)
@@ -96,123 +104,47 @@ dat_interest <- metadata %>%
 ```
 
 
-# Analysis - FIX
+# Meta-Analysis
+
+In order to conduct meta-analysis, we need to calculate the effect sizes of each study in our dataset.
 
 ## Effect Size Calculation
 ```{r}
-effect_size_dat <- metafor::escalc(
-  measure = "SMD",
-  n1i = n1i, n2i = n2i,
-  m1i = m1i, m2i = m2i,
-  sd1i = sd1i, sd2i = sd2i,
-  data = dat_interest, append = TRUE
-) %>%
-  # 3) mutate: clean/categorize moderators
-  mutate(
-    time_bin = case_when(
-      time <= 4 ~ "Early (≤4)",
-      time <= 10 ~ "Mid (5–10)",
-      TRUE ~ "Late (>10)"
-    ) #, method = fct_infreq(as.factor(method)), fungrp = fct_infreq(as.factor(fungrp))
-  ) %>%
-  # 4) tidyr::replace_na: ensure no NA text labels for plotting
-  tidyr::replace_na(list(genus = "Unknown", stock = "Unknown")) %>%
-  # 5) arrange: stable ordering
-  arrange(fungrp, method, time) 
+# create data frame of effect sizes
+effect_size_dat <- escalc("SMD", n1i = n1i, n2i = n2i, m1i = m1i, m2i = m2i, sd1i = sd1i, sd2i = sd2i, data = dat_interest, append = TRUE)
+```
 
+To get a better idea of the effect sizes (i.e. the standardized mean differences), we can summarize the means and variances of each study based on the functional group of the plant and the facility where they were exposed to CO2. This table is displayed the margin. Since all the effect sizes for each combination of methods and functional groups is positive, we expect that overall the plants in these categories who were exposed to more CO2 had higher plant masses than the plants exposed to the standard amount of CO2.
 
-# 6) group_by + summarise: roll-up summaries for a table
-mod_summ <- effect_size_dat %>%
+```{r}
+#| column: margin
+
+# want to summarize data based on functional group (fungrp)and C02 exposure (method)
+sum_table <- effect_size_dat %>%
   group_by(fungrp, method) %>%
   summarise(
     k = n(),
     mean_yi = mean(yi, na.rm = TRUE),
     mean_vi = mean(vi, na.rm = TRUE),
-    .groups = "drop"
+    .groups = "drop" # drops grouping once table is made
   ) %>%
-  arrange(desc(k))
-
-# 7) pivot_longer: reshape for a tidy summary table
-#mod_summ_long <- mod_summ %>%
-#  pivot_longer(cols = c(mean_yi, mean_vi), names_to = "metric", values_to = "value")
-
-```
-
-
-```{r}
-
-# yi = effect size of each study?
-# vi = variance of each study?
-mod_summ %>%
-  gt() %>%
-  tab_header(title = "Moderator Summary by Functional Group and Method") %>%
-  fmt_number(columns = c(mean_yi, mean_vi), decimals = 3)
-
-```
-
-
-```{r}
-# Mean Difference
-# ===== calculates MD for each study
-MD_results <- metacont(n1i, m1i, sd1i, n2i, m2i, sd2i, sm = "MD", data = metadata)
-summary(MD_results)
-
-# Standardized Mean Difference
-# ====== calculates SMD for each study
-SMD_results <- metacont(n1i, m1i, sd1i, n2i, m2i, sd2i, sm = "SMD", data = metadata)
-summary(SMD_results)
-```
-
-
-# Regression Models
-
-## Single Moderators/Covariates
-```{r}
-# Regression Models
-metareg_fg <- rma(yi, vi, mods= ~fungrp, data = effect_size_dat)
-metareg_time <- rma(yi, vi, mods= ~time, data = effect_size_dat)
-metareg_method <- rma(yi, vi, mods= ~method, data = effect_size_dat)
-metareg_stock <- rma(yi, vi, mods= ~stock, data = effect_size_dat)
-
-metareg_fg
-metareg_time
-metareg_method
-metareg_stock
-```
-
-## Multiple Moderators/Covariates
-```{r}
-metareg_fg_time_method <- rma(yi, vi, mods= ~fungrp + time + method, data = effect_size_dat)
-metareg_fg_method <- rma(yi, vi, mods= ~fungrp + method, data = effect_size_dat)
-metareg_time_method <- rma(yi, vi, mods= ~time + method, data = effect_size_dat)
-metareg_fg_time <- rma(yi, vi, mods= ~fungrp + time, data = effect_size_dat)
-
-metareg_fg_time_method
-metareg_fg_method
-metareg_time_method
-metareg_fg_time
-
-```
-
-
-
-# Plots
-## Distribution of Study Means
-```{r}
-ggplot(effect_size_dat, aes(x = yi)) +
-  geom_histogram() +
-  labs(
-    title = "Distribution of Standardized Mean Differences (yi)",
-    subtitle = "Computed via metafor::escalc with measure='SMD'",
-    x = "Standardized Mean Difference (yi)",
-    y = "Count",
-    caption = "Source: metadat::dat.curtis1998; Methods: metafor, dplyr, ggplot2"
+  arrange(desc(k)) %>%
+  mutate(
+    mean_yi = round(mean_yi, 3),
+    mean_vi = round(mean_vi, 3)
   )
 
+sum_table %>%
+  kable(
+    caption = "Moderator Summary by Functional Group and Method",
+    align = "lccc" # aligns columns, l=left and c=center
+  )
 ```
 
-
 ## Effect Size (Mean) Compared to Time Across Funtional Groups
+
+We can also plot the effect sizes against the time they were exposed to CO2, to see if there is a relationship between the differences in plant masses compared to the time the plants were exposed to CO2. We can separate this by functional group to see if the group adds an additional component to the relationship.
+
 ```{r}
 ggplot(effect_size_dat, aes(x = time, y = yi)) +
   geom_point(alpha = 0.7) +
@@ -228,7 +160,47 @@ ggplot(effect_size_dat, aes(x = time, y = yi)) +
 ```
 
 
+## Distribution of Study Means
+Lastly, we can examine the distribution of the standardized mean differences (SMD) for each study to get a better sense on how many studies have a positive SMD. A positive SMD value indiciates that the elevated CO2 levels result in a higher biomass for plants. 
+```{r}
+ggplot(effect_size_dat, aes(x = yi)) +
+  geom_histogram(bins=30) +
+  labs(
+    title = "Distribution of Standardized Mean Differences (yi)",
+    subtitle = "We count the effect sizes that fall into specific SMD ranges",
+    x = "Standardized Mean Difference (yi)",
+    y = "Count",
+    caption = "Majority of SMD's are positive"
+  )
+
+```
+
+We can see that majority of the SMD's are positive. This means that potentially the overall SMD obtained from our meta-analysis model could be significant, i.e. plants given more CO2 will have a higher biomass. We can run the full analysis model to determine if our insight is correct.  
+
+## Meta-Analysis Models
+
+There are two types of models we can use to conduct a meta-analysis study: fixed effect model and random effects model. Under the fixed effect model, we assume that all studies share a common, but unknown, true effect size. Under the random effects model, we assume that the true effect size is different for each study and that these true effect sizes are normally distributed about some average, unknown effect size. We can use the test of heterogeniuty to determine which model is bets for our data. We can then assess if our overall effect size, i.e. mean difference, is significant. 
+
+```{r}
+# Standardized Mean Difference
+# ====== calculates SMD for each study
+
+SMD_results <- metacont(n1i, m1i, sd1i, n2i, m2i, sd2i, sm = "SMD", data = metadata)
+summary(SMD_results)
+```
+
+Based on our output above, we can see the test of heterogeneity was statistically significant (p-value < 0.0001). This indicates the random effects model would suit our data better. Additionally, the standardized mean difference (SMD) between treatment groups is sstatistically signficant, as the confidence interval for the SMD does not contain 0. Additionally, the estimated between-study variance is quantified at 0.3756, meaning the difference and 52% of the total variability in our SMD is due to the between study variability (heterogeniety).
+
+
+The **forest** function allows us to see the results of our statistical meta-analysis through a plot. We can see the output below.
+```{r}
+forest(SMD_results)
+```
+
 ## Confidence Intervals of Each Study
+Since the plot above can be complicated to read and is too large to display, we examine the confidence intervals of each effect size from our SMD analysis in a simplified graph. This can give us an idea of how many studies reported a signficant difference in biomasses for plants given elevated CO2. Based on the plot below, we see the confidence intervals of more than our studies contain 0, meaning there is not a statistically signficant relationship between the CO2 levels and plant bimass. However, despite this, the overall difference across all the studies combined is significant due to the weight of each studies. 
+
+
 ```{r}
 
 # making data frame of confidence intervals
@@ -252,13 +224,18 @@ ggplot(ci_dat, aes(x = study_id, y = yi, ymin = ci_lo, ymax = ci_hi)) +
 
 ```
 
+::: {.callout-important}
+There are some additional meta-analysis tools that can be used such as meta-regression, and using Egger's regression test to quantify potential publication bias. You can read more about [meta-regression](https://casp-uk.net/news/understanding-meta-regression/#:~:text=Start%20by%20gathering%20relevant%20studies,and%20precision%20of%20your%20findings.) [publication bias](https://ebm.bmj.com/content/24/2/53) by clicking the links provided.
+:::
 
-# Conclusion/Summary:
+# Conclusion/Summary: 
+This report serves as an example for conducting a meta-analysis study. We aimed to determine if there was an overall difference between in above and below-ground biomass of plants exposed to C02 levels (control group) versus elevated C02 levels, using data from the **metadat** package. 
 
-The biomass of woody plants is higher for elevated CO2 levels compared to the biomass of woody plants for ambient CO2 levels.
+Out of the 102 studies, about less than half are statistically significant. Based on the test of heterogeneity results conducted in our analysis, we reject the null hypothesis that all studies share a common effect size and conclude there exists variation in the mean differences reported among the studies. Thus the random effects-model is the more approriate model to account for this variation in calculating the overall standardized mean difference (SMD) across all studies. Our overall reported SMD is 1.155. 
+
+Because the SMD is greater than 0, we conclude that elevated CO2 levels are associated with a significant increase in woody plant mass relative to ambient CO2 levels. Therefore, the biomass of woody plants is higher for elevated CO2 levels compared to the biomass of woody plants for ambient CO2 levels.
 
 
 # Functions used in data analysis:
-1. From dyplr: 
+1. From dyplr: select, group_by, summarize, arrange, mutate 
 2. From ggplot: geom_histogram, geom_pointrange, geom_point
-

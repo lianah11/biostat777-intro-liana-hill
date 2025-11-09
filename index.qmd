@@ -2,10 +2,9 @@
 title: "Home"
 ---
 
-Welcome! My name is Liana Hill. I am a first year PhD student in the Department of Biostatistics. I am from southern Maryland, specifically Prince George's County. In my free time, I love to go to the beach or spend time with my cats.
+Welcome! My name is Liana Hill. I am a first year PhD student in the Department of Biostatistics. I am from Upper Marlboro, Maryland in Prince George's County. In my free time, I love to spend time with my friends, watch movies, or spend time with my cats.
 
-![My Favorite Beach](.\images\south_africa_national_park_beach.png)
+![](.\images\south_africa_headshot.png){width=40%}
 
-Reminder to render the webpage: hit three dots in top right corner, select preview.
 
 
